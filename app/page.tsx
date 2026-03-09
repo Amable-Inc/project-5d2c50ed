@@ -11,6 +11,12 @@ interface StudySession {
   timestamp: Date;
 }
 
+interface DailyData {
+  date: string;
+  sessions: StudySession[];
+  totalDuration: number;
+}
+
 export default function Home() {
   const [activeTimer, setActiveTimer] = useState<ActivityType>(null);
   const [studySeconds, setStudySeconds] = useState(0);
@@ -18,6 +24,25 @@ export default function Home() {
   const [currentTask, setCurrentTask] = useState('');
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [showExerciseReminder, setShowExerciseReminder] = useState(false);
+
+  // Load sessions from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('studySessions');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setStudySessions(parsed.map((s: any) => ({
+        ...s,
+        timestamp: new Date(s.timestamp)
+      })));
+    }
+  }, []);
+
+  // Save sessions to localStorage
+  useEffect(() => {
+    if (studySessions.length > 0) {
+      localStorage.setItem('studySessions', JSON.stringify(studySessions));
+    }
+  }, [studySessions]);
 
   // Timer logic
   useEffect(() => {
@@ -49,6 +74,15 @@ export default function Home() {
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatDuration = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hrs > 0) {
+      return `${hrs}h ${mins}m`;
+    }
+    return `${mins}m`;
   };
 
   const startActivity = (type: ActivityType) => {
@@ -92,10 +126,46 @@ export default function Home() {
     }
   };
 
-  const getTotalStudyTime = () => {
-    const sessionTotal = studySessions.reduce((acc, session) => acc + session.duration, 0);
-    return sessionTotal;
+  // Group sessions by date
+  const getSessionsByDate = (): DailyData[] => {
+    const grouped = new Map<string, StudySession[]>();
+    
+    studySessions.forEach(session => {
+      const dateKey = new Date(session.timestamp).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, []);
+      }
+      grouped.get(dateKey)!.push(session);
+    });
+
+    const dailyData: DailyData[] = Array.from(grouped.entries()).map(([date, sessions]) => ({
+      date,
+      sessions,
+      totalDuration: sessions.reduce((acc, s) => acc + s.duration, 0)
+    }));
+
+    // Sort by date (most recent first)
+    return dailyData.sort((a, b) => {
+      return new Date(b.sessions[0].timestamp).getTime() - new Date(a.sessions[0].timestamp).getTime();
+    });
   };
+
+  const getTotalStudyTime = () => {
+    return studySessions.reduce((acc, session) => acc + session.duration, 0);
+  };
+
+  const getAverageStudyTime = () => {
+    const dailyData = getSessionsByDate();
+    if (dailyData.length === 0) return 0;
+    return getTotalStudyTime() / dailyData.length;
+  };
+
+  const dailyData = getSessionsByDate();
 
   return (
     <div className="min-h-screen bg-neutral-50 p-6">
@@ -179,32 +249,49 @@ export default function Home() {
         {/* Summary Stats */}
         <div className="bg-white rounded-lg p-6 mb-4 shadow-sm">
           <h2 className="text-lg font-medium text-neutral-900 mb-3">Summary</h2>
-          <div className="grid grid-cols-2 gap-4 text-center">
+          <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-sm text-neutral-500">Total Study Time</p>
-              <p className="text-xl font-light text-neutral-900">{formatTime(getTotalStudyTime())}</p>
+              <p className="text-sm text-neutral-500">Total Hours</p>
+              <p className="text-xl font-light text-neutral-900">{formatDuration(getTotalStudyTime())}</p>
             </div>
             <div>
-              <p className="text-sm text-neutral-500">Sessions Completed</p>
-              <p className="text-xl font-light text-neutral-900">{studySessions.length}</p>
+              <p className="text-sm text-neutral-500">Daily Average</p>
+              <p className="text-xl font-light text-neutral-900">{formatDuration(Math.round(getAverageStudyTime()))}</p>
+            </div>
+            <div>
+              <p className="text-sm text-neutral-500">Days Tracked</p>
+              <p className="text-xl font-light text-neutral-900">{dailyData.length}</p>
             </div>
           </div>
         </div>
 
-        {/* Recent Sessions */}
-        {studySessions.length > 0 && (
+        {/* Calendar View - Sessions by Date */}
+        {dailyData.length > 0 && (
           <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-lg font-medium text-neutral-900 mb-3">Recent Sessions</h2>
-            <div className="space-y-2">
-              {studySessions.slice(0, 5).map((session) => (
-                <div key={session.id} className="flex justify-between items-center py-2 border-b border-neutral-100 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-neutral-900">{session.task}</p>
-                    <p className="text-xs text-neutral-500">
-                      {new Date(session.timestamp).toLocaleString()}
-                    </p>
+            <h2 className="text-lg font-medium text-neutral-900 mb-4">Study Calendar</h2>
+            <div className="space-y-4">
+              {dailyData.map((day) => (
+                <div key={day.date} className="border-l-2 border-neutral-200 pl-4">
+                  <div className="flex justify-between items-baseline mb-2">
+                    <h3 className="text-sm font-medium text-neutral-900">{day.date}</h3>
+                    <span className="text-sm font-medium text-neutral-600">{formatDuration(day.totalDuration)}</span>
                   </div>
-                  <span className="text-sm text-neutral-600">{formatTime(session.duration)}</span>
+                  <div className="space-y-1">
+                    {day.sessions.map((session) => (
+                      <div key={session.id} className="flex justify-between items-center text-xs py-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-neutral-400">
+                            {new Date(session.timestamp).toLocaleTimeString('en-US', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
+                          <span className="text-neutral-700">{session.task}</span>
+                        </div>
+                        <span className="text-neutral-500">{formatDuration(session.duration)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
