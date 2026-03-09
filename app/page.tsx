@@ -24,8 +24,10 @@ export default function Home() {
   const [currentTask, setCurrentTask] = useState('');
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [showExerciseReminder, setShowExerciseReminder] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [claimedRewards, setClaimedRewards] = useState(0);
 
-  // Load sessions from localStorage
+  // Load data from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('studySessions');
     if (saved) {
@@ -35,6 +37,16 @@ export default function Home() {
         timestamp: new Date(s.timestamp)
       })));
     }
+
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode) {
+      setDarkMode(JSON.parse(savedDarkMode));
+    }
+
+    const savedClaimedRewards = localStorage.getItem('claimedRewards');
+    if (savedClaimedRewards) {
+      setClaimedRewards(JSON.parse(savedClaimedRewards));
+    }
   }, []);
 
   // Save sessions to localStorage
@@ -43,6 +55,16 @@ export default function Home() {
       localStorage.setItem('studySessions', JSON.stringify(studySessions));
     }
   }, [studySessions]);
+
+  // Save dark mode preference
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
+
+  // Save claimed rewards
+  useEffect(() => {
+    localStorage.setItem('claimedRewards', JSON.stringify(claimedRewards));
+  }, [claimedRewards]);
 
   // Timer logic
   useEffect(() => {
@@ -165,138 +187,195 @@ export default function Home() {
     return getTotalStudyTime() / dailyData.length;
   };
 
+  // Rewards calculation (1 reward per 50 minutes)
+  const getTotalRewards = () => {
+    const totalMinutes = Math.floor(getTotalStudyTime() / 60);
+    return Math.floor(totalMinutes / 50);
+  };
+
+  const getUnclaimedRewards = () => {
+    return getTotalRewards() - claimedRewards;
+  };
+
+  const claimRewards = () => {
+    const unclaimed = getUnclaimedRewards();
+    if (unclaimed > 0) {
+      setClaimedRewards(claimedRewards + unclaimed);
+    }
+  };
+
   const dailyData = getSessionsByDate();
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-6">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-light text-neutral-900">Study Tracker</h1>
-          <p className="text-sm text-neutral-500 mt-1">Track your study, breaks, and stay active</p>
-        </div>
-
-        {/* Exercise Reminder */}
-        {showExerciseReminder && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-900">💪 Time to stretch or exercise! You've been studying for 2 hours.</p>
-          </div>
-        )}
-
-        {/* Study Timer */}
-        <div className="bg-white rounded-lg p-6 mb-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-neutral-900">Study Time</h2>
-            <span className="text-3xl font-light text-neutral-900">{formatTime(studySeconds)}</span>
-          </div>
-          
-          <input
-            type="text"
-            placeholder="Task or course (optional)"
-            value={currentTask}
-            onChange={(e) => setCurrentTask(e.target.value)}
-            className="w-full px-3 py-2 mb-3 text-sm border border-neutral-200 rounded focus:outline-none focus:ring-1 focus:ring-neutral-400"
-            disabled={activeTimer === 'study'}
-          />
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => startActivity('study')}
-              className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${
-                activeTimer === 'study'
-                  ? 'bg-neutral-900 text-white'
-                  : 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200'
-              }`}
-            >
-              {activeTimer === 'study' ? 'Stop' : 'Start'}
-            </button>
-            <button
-              onClick={() => resetTimer('study')}
-              className="px-4 py-2 text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-
-        {/* Break Timer */}
-        <div className="bg-white rounded-lg p-6 mb-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-neutral-900">Break Time</h2>
-            <span className="text-3xl font-light text-neutral-900">{formatTime(breakSeconds)}</span>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => startActivity('break')}
-              className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${
-                activeTimer === 'break'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-green-50 text-green-700 hover:bg-green-100'
-              }`}
-            >
-              {activeTimer === 'break' ? 'Stop Break' : 'Start Break'}
-            </button>
-            <button
-              onClick={() => resetTimer('break')}
-              className="px-4 py-2 text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-
-        {/* Summary Stats */}
-        <div className="bg-white rounded-lg p-6 mb-4 shadow-sm">
-          <h2 className="text-lg font-medium text-neutral-900 mb-3">Summary</h2>
-          <div className="grid grid-cols-3 gap-4 text-center">
+    <div className={darkMode ? 'dark' : ''}>
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 p-6 transition-colors">
+        <div className="max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="mb-8 flex justify-between items-center">
             <div>
-              <p className="text-sm text-neutral-500">Total Hours</p>
-              <p className="text-xl font-light text-neutral-900">{formatDuration(getTotalStudyTime())}</p>
+              <h1 className="text-2xl font-light text-neutral-900 dark:text-neutral-100">Study Tracker</h1>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Track your study, breaks, and stay active</p>
             </div>
-            <div>
-              <p className="text-sm text-neutral-500">Daily Average</p>
-              <p className="text-xl font-light text-neutral-900">{formatDuration(Math.round(getAverageStudyTime()))}</p>
-            </div>
-            <div>
-              <p className="text-sm text-neutral-500">Days Tracked</p>
-              <p className="text-xl font-light text-neutral-900">{dailyData.length}</p>
-            </div>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2 rounded-lg bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors"
+              title={darkMode ? 'Light mode' : 'Dark mode'}
+            >
+              {darkMode ? '☀️' : '🌙'}
+            </button>
           </div>
-        </div>
 
-        {/* Calendar View - Sessions by Date */}
-        {dailyData.length > 0 && (
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-lg font-medium text-neutral-900 mb-4">Study Calendar</h2>
-            <div className="space-y-4">
-              {dailyData.map((day) => (
-                <div key={day.date} className="border-l-2 border-neutral-200 pl-4">
-                  <div className="flex justify-between items-baseline mb-2">
-                    <h3 className="text-sm font-medium text-neutral-900">{day.date}</h3>
-                    <span className="text-sm font-medium text-neutral-600">{formatDuration(day.totalDuration)}</span>
-                  </div>
-                  <div className="space-y-1">
-                    {day.sessions.map((session) => (
-                      <div key={session.id} className="flex justify-between items-center text-xs py-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-neutral-400">
-                            {new Date(session.timestamp).toLocaleTimeString('en-US', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
-                          </span>
-                          <span className="text-neutral-700">{session.task}</span>
-                        </div>
-                        <span className="text-neutral-500">{formatDuration(session.duration)}</span>
-                      </div>
-                    ))}
-                  </div>
+          {/* Exercise Reminder */}
+          {showExerciseReminder && (
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-900 dark:text-blue-100">💪 Time to stretch or exercise! You've been studying for 2 hours.</p>
+            </div>
+          )}
+
+          {/* Rewards Section */}
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 mb-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">Rewards</h2>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">1 reward per 50 minutes of study</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-light text-neutral-900 dark:text-neutral-100 mb-2">
+                  🏆 {getUnclaimedRewards()}
                 </div>
-              ))}
+                <button
+                  onClick={claimRewards}
+                  disabled={getUnclaimedRewards() === 0}
+                  className="px-4 py-2 text-sm font-medium bg-amber-500 text-white rounded hover:bg-amber-600 disabled:bg-neutral-300 dark:disabled:bg-neutral-700 disabled:cursor-not-allowed transition-colors"
+                >
+                  Claim {getUnclaimedRewards() > 0 ? `(${getUnclaimedRewards()})` : ''}
+                </button>
+              </div>
+            </div>
+            {claimedRewards > 0 && (
+              <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Total claimed: {claimedRewards} reward{claimedRewards !== 1 ? 's' : ''}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Study Timer */}
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 mb-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">Study Time</h2>
+              <span className="text-3xl font-light text-neutral-900 dark:text-neutral-100">{formatTime(studySeconds)}</span>
+            </div>
+            
+            <input
+              type="text"
+              placeholder="Task or course (optional)"
+              value={currentTask}
+              onChange={(e) => setCurrentTask(e.target.value)}
+              className="w-full px-3 py-2 mb-3 text-sm border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 rounded focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:focus:ring-neutral-600"
+              disabled={activeTimer === 'study'}
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => startActivity('study')}
+                className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${
+                  activeTimer === 'study'
+                    ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900'
+                    : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-600'
+                }`}
+              >
+                {activeTimer === 'study' ? 'Stop' : 'Start'}
+              </button>
+              <button
+                onClick={() => resetTimer('study')}
+                className="px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+              >
+                Reset
+              </button>
             </div>
           </div>
-        )}
+
+          {/* Break Timer */}
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 mb-4 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">Break Time</h2>
+              <span className="text-3xl font-light text-neutral-900 dark:text-neutral-100">{formatTime(breakSeconds)}</span>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => startActivity('break')}
+                className={`flex-1 py-2 px-4 rounded text-sm font-medium transition-colors ${
+                  activeTimer === 'break'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50'
+                }`}
+              >
+                {activeTimer === 'break' ? 'Stop Break' : 'Start Break'}
+              </button>
+              <button
+                onClick={() => resetTimer('break')}
+                className="px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 mb-4 shadow-sm">
+            <h2 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-3">Summary</h2>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">Total Hours</p>
+                <p className="text-xl font-light text-neutral-900 dark:text-neutral-100">{formatDuration(getTotalStudyTime())}</p>
+              </div>
+              <div>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">Daily Average</p>
+                <p className="text-xl font-light text-neutral-900 dark:text-neutral-100">{formatDuration(Math.round(getAverageStudyTime()))}</p>
+              </div>
+              <div>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">Days Tracked</p>
+                <p className="text-xl font-light text-neutral-900 dark:text-neutral-100">{dailyData.length}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Calendar View - Sessions by Date */}
+          {dailyData.length > 0 && (
+            <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 shadow-sm">
+              <h2 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-4">Study Calendar</h2>
+              <div className="space-y-4">
+                {dailyData.map((day) => (
+                  <div key={day.date} className="border-l-2 border-neutral-200 dark:border-neutral-700 pl-4">
+                    <div className="flex justify-between items-baseline mb-2">
+                      <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{day.date}</h3>
+                      <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400">{formatDuration(day.totalDuration)}</span>
+                    </div>
+                    <div className="space-y-1">
+                      {day.sessions.map((session) => (
+                        <div key={session.id} className="flex justify-between items-center text-xs py-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-neutral-400 dark:text-neutral-500">
+                              {new Date(session.timestamp).toLocaleTimeString('en-US', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </span>
+                            <span className="text-neutral-700 dark:text-neutral-300">{session.task}</span>
+                          </div>
+                          <span className="text-neutral-500 dark:text-neutral-400">{formatDuration(session.duration)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
